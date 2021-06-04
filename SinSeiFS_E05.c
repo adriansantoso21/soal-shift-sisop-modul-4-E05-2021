@@ -24,6 +24,8 @@ void getDirAndFile(char *dir, char *file, char *path) {
     sprintf(file, "%s", token);
     token = strtok(NULL, "/");
     if (token != NULL) {
+    	printf("ini token : %s\n", token);
+    	strcat(dir,"/");
     	strcat(dir,file);
     }
   }
@@ -412,6 +414,42 @@ static int _mkdir(const char *path, mode_t mode)
 	return 0;
 }
 
+static int _rmdir(const char *path)
+{
+printf("proses _rmdir\n");
+	char fpath[1000];
+	changePath(fpath, path, 0, 0);
+	int res;
+
+	res = rmdir(fpath);
+
+  char syncOrigPath[1000];
+  char syncDirPath[1000];
+  char syncFilePath[1000];
+  memset(syncOrigPath, 0, sizeof(syncOrigPath));
+  strcpy(syncOrigPath, path);
+  getDirAndFile(syncDirPath, syncFilePath, syncOrigPath);
+  memset(syncOrigPath, 0, sizeof(syncOrigPath));
+  strcpy(syncOrigPath, syncDirPath);
+  do {
+    char syncPath[1000];
+    memset(syncPath, 0, sizeof(syncPath));
+    nextSync(syncDirPath);
+    if (strcmp(syncDirPath, syncOrigPath) == 0) break;
+    changePath(syncPath, syncDirPath, 0, 0);
+    if (access(syncPath, F_OK) == -1) continue;
+    strcat(syncPath, syncFilePath);
+    rmdir(syncPath);
+  } while (1);
+
+  const char *desc[] = {path};
+  logFile("WARNING", "RMDIR", res, 1, desc);
+
+	if (res == -1) return -errno;
+
+	return 0;
+}
+
 static int _rename(const char *from, const char *to)
 {
 printf("proses _rename\n");
@@ -472,6 +510,24 @@ printf("proses _rename\n");
 	return 0;
 }
 
+static int _open(const char *path, struct fuse_file_info *fi)
+{
+	char fpath[1000];
+  changePath(fpath, path, 0, 1);
+
+	int res;
+
+	res = open(fpath, fi->flags);
+
+  const char *desc[] = {path};
+  logFile("INFO", "OPEN", res, 1, desc);
+
+	if (res == -1) return -errno;
+
+	fi->fh = res;
+	return 0;
+}
+
 static int _read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
 	char fpath[1000];
@@ -489,6 +545,56 @@ static int _read(const char *path, char *buf, size_t size, off_t offset, struct 
 
   const char *desc[] = {path};
   logFile("INFO", "READ", res, 1, desc);
+
+	if (res == -1) res = -errno;
+
+	if(fi == NULL) close(fd);
+	return res;
+}
+
+static int _write(const char *path, const char *buf, size_t size,
+		     off_t offset, struct fuse_file_info *fi)
+{
+printf("proses _write\n");
+	char fpath[1000];
+	changePath(fpath, path, 1, 0);
+
+	int fd;
+	int res;
+
+	(void) fi;
+	if(fi == NULL) fd = open(fpath, O_WRONLY);
+	else fd = fi->fh;
+
+	if (fd == -1) return -errno;
+
+	res = pwrite(fd, buf, size, offset);
+
+  char syncOrigPath[1000];
+  char syncDirPath[1000];
+  char syncFilePath[1000];
+  memset(syncOrigPath, 0, sizeof(syncOrigPath));
+  strcpy(syncOrigPath, path);
+  getDirAndFile(syncDirPath, syncFilePath, syncOrigPath);
+  memset(syncOrigPath, 0, sizeof(syncOrigPath));
+  strcpy(syncOrigPath, syncDirPath);
+  do {
+    char syncPath[1000];
+    int syncFd;
+    memset(syncPath, 0, sizeof(syncPath));
+    nextSync(syncDirPath);
+    if (strcmp(syncDirPath, syncOrigPath) == 0) break;
+    changePath(syncPath, syncDirPath, 0, 1);
+    if (access(syncPath, F_OK) == -1) continue;
+    strcat(syncPath, syncFilePath);
+    syncFd = open(syncPath, O_WRONLY);
+    if (syncFd == -1) return -errno;
+    pwrite(syncFd, buf, size, offset);
+    close(syncFd);
+  } while (1);
+
+  const char *desc[] = {path};
+  logFile("INFO", "WRITE", res, 1, desc);
 
 	if (res == -1) res = -errno;
 
@@ -518,8 +624,11 @@ static const struct fuse_operations _oper = {
 	.access		= _access,
 	.readdir	= _readdir,
 	.mkdir		= _mkdir,
+	.rmdir		= _rmdir,
 	.rename		= _rename,
+	.open		  = _open,
 	.read	    = _read,
+	.write		= _write,
 	.statfs		= _statfs,
 };
 
