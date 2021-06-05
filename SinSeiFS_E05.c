@@ -205,46 +205,6 @@ static int _getattr(const char *path, struct stat *stbuf)
 	return 0;
 }
 
-static int _access(const char *path, int mask)
-{
-	char fpath[1000];
-	changePath(fpath, path, 0, 1);
-  if (access(fpath, F_OK) == -1) {
-    memset(fpath, 0, 1000);
-    changePath(fpath, path, 0, 0);
-  }
-
-	int res;
-
-	res = access(fpath, mask);
-
-  const char *desc[] = {path};
-  logFile("INFO", "ACCESS", res, 1, desc);
-
-	if (res == -1) return -errno;
-
-
-	return 0;
-}
-
-static int _readlink(const char *path, char *buf, size_t size)
-{
-	char fpath[1000];
-	changePath(fpath, path, 0, 1);
-
-	int res;
-
-	res = readlink(fpath, buf, size - 1);
-
-  const char *desc[] = {path};
-  logFile("INFO", "READLINK", res, 1, desc);
-
-	if (res == -1) return -errno;
-
-	buf[res] = '\0';
-	return 0;
-}
-
 static int _readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
 	char fpath[1000];
@@ -422,25 +382,6 @@ printf("proses _rmdir\n");
 	return 0;
 }
 
-static int _symlink(const char *from, const char *to)
-{
-	char ffrom[1000];
-	char fto[1000];
-	changePath(ffrom, from, 0, 1);
-	changePath(fto, to, 0, 1);
-
-	int res;
-
-	res = symlink(ffrom, fto);
-
-  const char *desc[] = {from, to};
-  logFile("INFO", "SYMLINK", res, 2, desc);
-
-	if (res == -1) return -errno;
-
-	return 0;
-}
-
 static int _rename(const char *from, const char *to)
 {
 	char ffrom[1000];
@@ -483,74 +424,6 @@ static int _rename(const char *from, const char *to)
 	return 0;
 }
 
-static int _link(const char *from, const char *to)
-{
-printf("proses _link\n");
-	char ffrom[1000];
-	char fto[1000];
-	changePath(ffrom, from, 0, 1);
-	changePath(fto, to, 0, 1);
-
-	int res;
-
-	res = link(ffrom, fto);
-
-  const char *desc[] = {from, to};
-  logFile("INFO", "LINK", res, 2, desc);
-
-	if (res == -1) return -errno;
-
-	return 0;
-}
-
-static int _chmod(const char *path, mode_t mode)
-{
-	char fpath[1000];
-	changePath(fpath, path, 0, 1);
-  if (access(fpath, F_OK) == -1) {
-    memset(fpath, 0, sizeof(fpath));
-    changePath(fpath, path, 0, 0);
-  }
-
-	int res;
-
-	res = chmod(fpath, mode);
-
-  char modeBuff[100];
-  sprintf(modeBuff, "%d", mode);
-  const char *desc[] = {path, modeBuff};
-  logFile("INFO", "CHMOD", res, 2, desc);
-
-	if (res == -1) return -errno;
-
-	return 0;
-}
-
-static int _chown(const char *path, uid_t uid, gid_t gid)
-{
-	char fpath[1000];
-  changePath(fpath, path, 0, 1);
-  if (access(fpath, F_OK) == -1) {
-    memset(fpath, 0, sizeof(fpath));
-    changePath(fpath, path, 0, 0);
-  }
-
-	int res;
-
-	res = lchown(fpath, uid, gid);
-
-  char uidBuff[100];
-  char gidBuff[100];
-  sprintf(uidBuff, "%d", uid);
-  sprintf(gidBuff, "%d", gid);
-  const char *desc[] = {path, uidBuff, gidBuff};
-  logFile("INFO", "CHOWN", res, 3, desc);
-
-	if (res == -1) return -errno;
-
-	return 0;
-}
-
 static int _utimens(const char *path, const struct timespec ts[2])
 {
 	char fpath[1000];
@@ -570,61 +443,6 @@ static int _utimens(const char *path, const struct timespec ts[2])
 
 	if (res == -1) return -errno;
 
-	return 0;
-}
-
-static int _create(const char *path, mode_t mode, struct fuse_file_info *fi)
-{
-	char fpath[1000];
-  changePath(fpath, path, 1, 0);
-
-	int res;
-
-	res = open(fpath, fi->flags, mode);
-
-  char syncOrigPath[1000];
-  char syncDirPath[1000];
-  char syncFilePath[1000];
-  memset(syncOrigPath, 0, sizeof(syncOrigPath));
-  strcpy(syncOrigPath, path);
-  getDirAndFile(syncDirPath, syncFilePath, syncOrigPath);
-  memset(syncOrigPath, 0, sizeof(syncOrigPath));
-  strcpy(syncOrigPath, syncDirPath);
-  do {
-    char syncPath[1000];
-    memset(syncPath, 0, sizeof(syncPath));
-    nextSync(syncDirPath);
-    if (strcmp(syncDirPath, syncOrigPath) == 0) break;
-    changePath(syncPath, syncDirPath, 0, 1);
-    if (access(syncPath, F_OK) == -1) continue;
-    strcat(syncPath, syncFilePath);
-    close(open(syncPath, fi->flags, mode));
-  } while (1);
-
-  const char *desc[] = {path};
-  logFile("INFO", "CREATE", res, 1, desc);
-
-	if (res == -1) return -errno;
-
-	fi->fh = res;
-	return 0;
-}
-
-static int _open(const char *path, struct fuse_file_info *fi)
-{
-	char fpath[1000];
-  changePath(fpath, path, 0, 1);
-
-	int res;
-
-	res = open(fpath, fi->flags);
-
-  const char *desc[] = {path};
-  logFile("INFO", "OPEN", res, 1, desc);
-
-	if (res == -1) return -errno;
-
-	fi->fh = res;
 	return 0;
 }
 
@@ -718,20 +536,12 @@ static int _statfs(const char *path, struct statvfs *stbuf)
 
 static const struct fuse_operations _oper = {
 	.getattr	= _getattr,
-	.access		= _access,
-	.readlink	= _readlink,
 	.readdir	= _readdir,
 	.mkdir		= _mkdir,
-	.symlink	= _symlink,
 	.unlink		= _unlink,
 	.rmdir		= _rmdir,
 	.rename		= _rename,
-	.link		  = _link,
-	.chmod		= _chmod,
-	.chown		= _chown,
 	.utimens	= _utimens,
-	.open		  = _open,
-	.create 	= _create,
 	.read	    = _read,
 	.write		= _write,
 	.statfs		= _statfs,
