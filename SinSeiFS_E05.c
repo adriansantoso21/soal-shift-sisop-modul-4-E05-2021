@@ -9,9 +9,9 @@
 #include <sys/time.h>
 #include <time.h>
 
-static const char *dirpath = "/home/adr01/Documents";
+static const char *dirpath = "/home/adr01/Downloads";
 static const char *key = "9(ku@AW1[Lmvgax6q`5Y2Ry?+sF!^HKQiBXCUSe&0M.b%rI'7d)o4~VfZ*{#:}ETt$3J-zpc]lnh8,GwP_ND|jO";
-static const char *logpath = "/home/adr01/Documents/fuse_log.txt";
+static const char *logpath = "/home/adr01/SinSeiFS.log.txt";
 
 // Dapatkan directory dan nama file
 void getDirAndFile(char *dir, char *file, char *path) {
@@ -24,7 +24,6 @@ void getDirAndFile(char *dir, char *file, char *path) {
     sprintf(file, "%s", token);
     token = strtok(NULL, "/");
     if (token != NULL) {
-    	printf("ini token : %s\n", token);
     	strcat(dir,"/");
     	strcat(dir,file);
     }
@@ -75,7 +74,6 @@ void nextSync(char *syncDirPath) {
   sprintf(syncDirPath, "%s", construct);
 }
 
-// Untuk 
 void changePath(char *fpath, const char *path, int isWriteOper, int isFileAsked) {
   char *ptr = strstr(path, "/encv1_");
   int state = 0;
@@ -142,109 +140,6 @@ void changePath(char *fpath, const char *path, int isWriteOper, int isFileAsked)
   }
 }
 
-void splitter(char *path) {
-  DIR *dp;
-  struct dirent *de;
-  dp = opendir(path);
-  while ((de = readdir(dp)) != NULL) {
-    if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
-    char newPath[1000];
-    sprintf(newPath, "%s/%s", path, de->d_name);
-    if (de->d_type == DT_DIR) {
-      splitter(newPath);
-    }
-    if (de->d_type == DT_REG) {
-      FILE *pathFilePointer = fopen(newPath, "rb");
-      fseek(pathFilePointer, 0, SEEK_END);
-      long pathFileSize = ftell(pathFilePointer);
-      rewind(pathFilePointer);
-      struct stat st;
-      lstat(newPath, &st);
-      int index = 0;
-      while(pathFileSize > 0) {
-        char newFileSplit[1000];
-        char buff[1024];
-        //sprintf(newFileSplit, "%s.%03d", newPath, index++);
-        
-        sprintf(newFileSplit, "%s", newPath);
-        sprintf(newFileSplit, ".%03d", index++);
-        close(creat(newFileSplit, st.st_mode));
-        int size;
-        if (pathFileSize >= 1024) {
-          size = 1024;
-          pathFileSize-=1024;
-        } else {
-          size = pathFileSize;
-          pathFileSize = 0;
-        }
-        memset(buff, 0, sizeof(buff));
-        fread(buff, 1, size, pathFilePointer);
-
-        FILE *pathFileOut = fopen(newFileSplit, "wb");
-        fwrite(buff, 1, size, pathFileOut);
-        fclose(pathFileOut);
-      }
-      fclose(pathFilePointer);
-      unlink(newPath);
-    }
-  }
-}
-
-void unsplitter(char *path) {
-  DIR *dp;
-  struct dirent *de;
-  dp = opendir(path);
-  while ((de = readdir(dp)) != NULL) {
-    if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
-    if (de->d_type == DT_DIR) {
-      char newPath[1000];
-      sprintf(newPath, "%s/%s", path, de->d_name);
-      unsplitter(newPath);
-    }
-    if (de->d_type == DT_REG) {
-      char *ptr = strrchr(de->d_name, '.');
-      if (strcmp(ptr, ".000") != 0) continue;
-      char pathFileName[1000];
-      char pathToFile[1000];
-      snprintf(pathFileName, ptr-(de->d_name)+1, "%s", de->d_name);
-
-      strcat(pathToFile, path);
-      strcat(pathToFile, "/");
-      strcat(pathToFile, pathFileName);
-
-      char temp[1000];
-      
-      sprintf(temp, "%s", pathToFile);
-      strcat(temp, ".000");
-        
-      struct stat st;
-      lstat(temp, &st);
-      close(creat(pathToFile, st.st_mode));
-
-      int index = 0;
-      FILE *pathFilePointer = fopen(pathToFile, "wb");
-      while (1) {
-        char partName[1000];
-        
-        sprintf(partName, "%s", pathToFile);
-        sprintf(partName, ".%03d", index++);
-        
-        if (access(partName, F_OK) == -1) break;
-        FILE *pathToPart = fopen(partName, "rb");
-        fseek(pathToPart, 0, SEEK_END);
-        long pathFileSize = ftell(pathToPart);
-        rewind(pathToPart);
-        char buff[1024];
-        fread(buff, 1, pathFileSize, pathToPart);
-        fwrite(buff, 1, pathFileSize, pathFilePointer);
-        fclose(pathToPart);
-        unlink(partName);
-      }
-      fclose(pathFilePointer);
-    }
-  }
-}
-
 void logFile(char *level, char *cmd, int res, int lenDesc, const char *desc[]) {
   FILE *f = fopen(logpath, "a");
   time_t t;
@@ -253,7 +148,7 @@ void logFile(char *level, char *cmd, int res, int lenDesc, const char *desc[]) {
 
   time(&t);
   tmp = localtime(&t);
-  strftime(timeBuff, sizeof(timeBuff), "%y%m%d-%H:%M:%S", tmp);
+  strftime(timeBuff, sizeof(timeBuff), "%d%m%Y-%H:%M:%S", tmp);
 
   fprintf(f, "%s::%s::%s::%d", level, timeBuff, cmd, res);
   for (int i = 0; i < lenDesc; i++) {
@@ -267,16 +162,17 @@ void logFile(char *level, char *cmd, int res, int lenDesc, const char *desc[]) {
 static int _getattr(const char *path, struct stat *stbuf)
 {
 
-	char fpath[1000];
+  char fpath[1000];
   changePath(fpath, path, 0, 1);
+  
   if (access(fpath, F_OK) == -1) {
     memset(fpath, 0, sizeof(fpath));
     changePath(fpath, path, 0, 0);
   }
 
-	int res;
+  int res;
 
-	res = lstat(fpath, stbuf);
+  res = lstat(fpath, stbuf);
 
   const char *desc[] = {path};
   logFile("INFO", "GETATTR", res, 1, desc);
@@ -289,7 +185,6 @@ static int _getattr(const char *path, struct stat *stbuf)
 
 static int _access(const char *path, int mask)
 {
-printf("proses _access\n");
 	char fpath[1000];
 	changePath(fpath, path, 0, 1);
   if (access(fpath, F_OK) == -1) {
@@ -307,6 +202,24 @@ printf("proses _access\n");
 	if (res == -1) return -errno;
 
 
+	return 0;
+}
+
+static int _readlink(const char *path, char *buf, size_t size)
+{
+	char fpath[1000];
+	changePath(fpath, path, 0, 1);
+
+	int res;
+
+	res = readlink(fpath, buf, size - 1);
+
+  const char *desc[] = {path};
+  logFile("INFO", "READLINK", res, 1, desc);
+
+	if (res == -1) return -errno;
+
+	buf[res] = '\0';
 	return 0;
 }
 
@@ -378,7 +291,7 @@ static int _mkdir(const char *path, mode_t mode)
   if (filePtr != NULL) {
     if (filePtr - ptr == 0) {
       const char *desc[] = {path};
-      logFile("SPECIAL", "ENCV1", 0, 1, desc);
+      logFile("INFO", "MKDIR", 0, 1, desc);
     }
   }
 
@@ -408,6 +321,42 @@ static int _mkdir(const char *path, mode_t mode)
 
   const char *desc[] = {path};
   logFile("INFO", "MKDIR", res, 1, desc);
+
+	if (res == -1) return -errno;
+
+	return 0;
+}
+
+static int _unlink(const char *path)
+{
+	char fpath[1000];
+	changePath(fpath, path, 0, 1);
+
+	int res;
+
+	res = unlink(fpath);
+
+  char syncOrigPath[1000];
+  char syncDirPath[1000];
+  char syncFilePath[1000];
+  memset(syncOrigPath, 0, sizeof(syncOrigPath));
+  strcpy(syncOrigPath, path);
+  getDirAndFile(syncDirPath, syncFilePath, syncOrigPath);
+  memset(syncOrigPath, 0, sizeof(syncOrigPath));
+  strcpy(syncOrigPath, syncDirPath);
+  do {
+    char syncPath[1000];
+    memset(syncPath, 0, sizeof(syncPath));
+    nextSync(syncDirPath);
+    if (strcmp(syncDirPath, syncOrigPath) == 0) break;
+    changePath(syncPath, syncDirPath, 0, 1);
+    if (access(syncPath, F_OK) == -1) continue;
+    strcat(syncPath, syncFilePath);
+    unlink(syncPath);
+  } while (1);
+
+  const char *desc[] = {path};
+  logFile("WARNING", "UNLINK", res, 1, desc);
 
 	if (res == -1) return -errno;
 
@@ -450,6 +399,25 @@ printf("proses _rmdir\n");
 	return 0;
 }
 
+static int _symlink(const char *from, const char *to)
+{
+	char ffrom[1000];
+	char fto[1000];
+	changePath(ffrom, from, 0, 1);
+	changePath(fto, to, 0, 1);
+
+	int res;
+
+	res = symlink(ffrom, fto);
+
+  const char *desc[] = {from, to};
+  logFile("INFO", "SYMLINK", res, 2, desc);
+
+	if (res == -1) return -errno;
+
+	return 0;
+}
+
 static int _rename(const char *from, const char *to)
 {
 printf("proses _rename\n");
@@ -467,34 +435,11 @@ printf("proses _rename\n");
   }
 
   char *toPtr = strrchr(to, '/');
-  char *fromPtr = strrchr(from ,'/');
-  char *toStartPtr = strstr(toPtr, "/encv2_");
-  char *fromStartPtr = strstr(fromPtr, "/encv2_");
-  if (toStartPtr != NULL) {
-    if (toStartPtr - toPtr == 0) {
-      DIR *d = opendir(ffrom);
-      if (d) {
-        closedir(d);
-        splitter(ffrom);
-        const char *desc[] = {fto};
-        logFile("SPECIAL", "ENCV2", 0, 1, desc);
-      }
-    }
-  }
-  if (fromStartPtr != NULL) {
-    if (fromStartPtr - fromPtr == 0) {
-      DIR *d = opendir(ffrom);
-      if (d) {
-        closedir(d);
-        unsplitter(ffrom);
-      }
-    }
-  }
-  toStartPtr = strstr(toPtr, "/encv1_");
+  char *toStartPtr = strstr(toPtr, "/encv1_");
   if (toStartPtr != NULL) {
     if (toStartPtr - toPtr == 0) {
       const char *desc[] = {fto};
-      logFile("SPECIAL", "ENCV1", 0, 1, desc);
+      logFile("INFO", "RENAME", 0, 1, desc);
     }
   }
 
@@ -507,6 +452,133 @@ printf("proses _rename\n");
 
 	if (res == -1) return -errno;
 
+	return 0;
+}
+
+static int _link(const char *from, const char *to)
+{
+printf("proses _link\n");
+	char ffrom[1000];
+	char fto[1000];
+	changePath(ffrom, from, 0, 1);
+	changePath(fto, to, 0, 1);
+
+	int res;
+
+	res = link(ffrom, fto);
+
+  const char *desc[] = {from, to};
+  logFile("INFO", "LINK", res, 2, desc);
+
+	if (res == -1) return -errno;
+
+	return 0;
+}
+
+static int _chmod(const char *path, mode_t mode)
+{
+	char fpath[1000];
+	changePath(fpath, path, 0, 1);
+  if (access(fpath, F_OK) == -1) {
+    memset(fpath, 0, sizeof(fpath));
+    changePath(fpath, path, 0, 0);
+  }
+
+	int res;
+
+	res = chmod(fpath, mode);
+
+  char modeBuff[100];
+  sprintf(modeBuff, "%d", mode);
+  const char *desc[] = {path, modeBuff};
+  logFile("INFO", "CHMOD", res, 2, desc);
+
+	if (res == -1) return -errno;
+
+	return 0;
+}
+
+static int _chown(const char *path, uid_t uid, gid_t gid)
+{
+	char fpath[1000];
+  changePath(fpath, path, 0, 1);
+  if (access(fpath, F_OK) == -1) {
+    memset(fpath, 0, sizeof(fpath));
+    changePath(fpath, path, 0, 0);
+  }
+
+	int res;
+
+	res = lchown(fpath, uid, gid);
+
+  char uidBuff[100];
+  char gidBuff[100];
+  sprintf(uidBuff, "%d", uid);
+  sprintf(gidBuff, "%d", gid);
+  const char *desc[] = {path, uidBuff, gidBuff};
+  logFile("INFO", "CHOWN", res, 3, desc);
+
+	if (res == -1) return -errno;
+
+	return 0;
+}
+
+static int _utimens(const char *path, const struct timespec ts[2])
+{
+	char fpath[1000];
+  changePath(fpath, path, 0, 1);
+  if (access(fpath, F_OK) == -1) {
+    memset(fpath, 0, sizeof(fpath));
+    changePath(fpath, path, 0, 0);
+  }
+
+	int res;
+
+	/* don't use utime/utimes since they follow symlinks */
+	res = utimensat(0, fpath, ts, AT_SYMLINK_NOFOLLOW);
+
+  const char *desc[] = {path};
+  logFile("INFO", "UTIMENSAT", res, 1, desc);
+
+	if (res == -1) return -errno;
+
+	return 0;
+}
+
+static int _create(const char *path, mode_t mode, struct fuse_file_info *fi)
+{
+	char fpath[1000];
+  changePath(fpath, path, 1, 0);
+
+	int res;
+
+	res = open(fpath, fi->flags, mode);
+
+  char syncOrigPath[1000];
+  char syncDirPath[1000];
+  char syncFilePath[1000];
+  memset(syncOrigPath, 0, sizeof(syncOrigPath));
+  strcpy(syncOrigPath, path);
+  getDirAndFile(syncDirPath, syncFilePath, syncOrigPath);
+  memset(syncOrigPath, 0, sizeof(syncOrigPath));
+  strcpy(syncOrigPath, syncDirPath);
+  do {
+    char syncPath[1000];
+    memset(syncPath, 0, sizeof(syncPath));
+    nextSync(syncDirPath);
+    if (strcmp(syncDirPath, syncOrigPath) == 0) break;
+    changePath(syncPath, syncDirPath, 0, 1);
+    if (access(syncPath, F_OK) == -1) continue;
+    strcat(syncPath, syncFilePath);
+    close(open(syncPath, fi->flags, mode));
+  } while (1);
+
+  const char *desc[] = {path};
+  logFile("INFO", "CREATE", res, 1, desc);
+
+	if (res == -1) return -errno;
+
+	fi->fh = res;
 	return 0;
 }
 
@@ -552,10 +624,8 @@ static int _read(const char *path, char *buf, size_t size, off_t offset, struct 
 	return res;
 }
 
-static int _write(const char *path, const char *buf, size_t size,
-		     off_t offset, struct fuse_file_info *fi)
+static int _write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-printf("proses _write\n");
 	char fpath[1000];
 	changePath(fpath, path, 1, 0);
 
@@ -622,11 +692,19 @@ printf("proses _statfs\n");
 static const struct fuse_operations _oper = {
 	.getattr	= _getattr,
 	.access		= _access,
+	.readlink	= _readlink,
 	.readdir	= _readdir,
 	.mkdir		= _mkdir,
+	.symlink	= _symlink,
+	.unlink		= _unlink,
 	.rmdir		= _rmdir,
 	.rename		= _rename,
+	.link		  = _link,
+	.chmod		= _chmod,
+	.chown		= _chown,
+	.utimens	= _utimens,
 	.open		  = _open,
+	.create 	= _create,
 	.read	    = _read,
 	.write		= _write,
 	.statfs		= _statfs,
