@@ -9,9 +9,15 @@
 #include <sys/time.h>
 #include <time.h>
 
-static const char *dirpath = "/home/adr01/Downloads";
-static const char *key = "9(ku@AW1[Lmvgax6q`5Y2Ry?+sF!^HKQiBXCUSe&0M.b%rI'7d)o4~VfZ*{#:}ETt$3J-zpc]lnh8,GwP_ND|jO";
-static const char *logpath = "/home/adr01/SinSeiFS.log.txt";
+char *dirpath = "/home/adr01/Downloads";
+char *logpath = "/home/adr01/SinSeiFS.log.txt";
+char *logpath1 = "/home/adr01/Documents/SesiLab4/Soal1/log.txt";
+
+char *FileExtension(char *filename) {
+    char *temp = strrchr(filename, '/');
+    return temp + 1;
+}
+
 
 // Dapatkan directory dan nama file
 void getDirAndFile(char *dir, char *file, char *path) {
@@ -32,16 +38,20 @@ void getDirAndFile(char *dir, char *file, char *path) {
 
 // Untuk enkripsi dan dekripsi
 void decrypt(char *path, int isEncrypt) {
-  char *cursor = path;
-  while (cursor-path < strlen(path)) {
-    char *ptr = strchr(key, *cursor);
-    if (ptr != NULL) {
-      int index = (ptr-key+strlen(key)-10)%strlen(key);
-      if (isEncrypt) index = (ptr-key+strlen(key)+10)%strlen(key);
-      *cursor = *(key+index);
-    }
-    cursor++;
+  char *str = path;
+  int i = 0;
+  while(str[i]!='\0'){
+		 if(!((str[i]>=0&&str[i]<65)||(str[i]>90&&str[i]<97)||(str[i]>122&&str[i]<=127)))
+		 {
+			 if(str[i]>='A'&&str[i]<='Z') str[i] = 'Z'+'A'- str[i]; 
+			 if(str[i]>='a'&&str[i]<='z') str[i] = 'z'+'a'- str[i];
+		 } 
+    
+		  if(((str[i]>=0&&str[i]<65)||(str[i]>90&&str[i]<97)||(str[i]>122&&str[i]<=127))) str[i] = str[i];    
+
+		 i++;
   }
+  
 }
 
 void nextSync(char *syncDirPath) {
@@ -75,7 +85,7 @@ void nextSync(char *syncDirPath) {
 }
 
 void changePath(char *fpath, const char *path, int isWriteOper, int isFileAsked) {
-  char *ptr = strstr(path, "/encv1_");
+  char *ptr = strstr(path, "/AtoZ_");
   int state = 0;
   if (ptr != NULL) {
     if (strstr(ptr+1, "/") != NULL) state = 1;
@@ -156,6 +166,18 @@ void logFile(char *level, char *cmd, int res, int lenDesc, const char *desc[]) {
   }
   fprintf(f, "\n");
 
+  fclose(f);
+}
+
+void logFile1(char *pathasal, char *pathakhir) {
+	char fileExt[300], fileExt1[300];	
+	memset(fileExt, 0, sizeof(fileExt));
+	
+	strcpy(fileExt, FileExtension(pathasal));
+	strcpy(fileExt1, FileExtension(pathakhir));
+	
+  FILE *f = fopen(logpath1, "a");
+  fprintf(f, "/home/adr01/Downloads/%s -> /home/adr01/Downloads/%s\n", fileExt, fileExt1);
   fclose(f);
 }
 
@@ -247,7 +269,7 @@ static int _readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t o
 		st.st_ino = de->d_ino;
 		st.st_mode = de->d_type << 12;
     if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0) continue;
-    if (strstr(path, "/encv1_") != NULL) {
+    if (strstr(path, "/AtoZ_") != NULL) {
       char encryptThis[1000];
       strcpy(encryptThis, de->d_name);
       if (de->d_type == DT_REG) {
@@ -287,7 +309,7 @@ static int _mkdir(const char *path, mode_t mode)
 	changePath(fpath, path, 1, 0);
 
   char *ptr = strrchr(path, '/');
-  char *filePtr = strstr(ptr, "/encv1_");
+  char *filePtr = strstr(ptr, "/AtoZ_");
   if (filePtr != NULL) {
     if (filePtr - ptr == 0) {
       const char *desc[] = {path};
@@ -318,9 +340,10 @@ static int _mkdir(const char *path, mode_t mode)
     mkdir(syncPath, mode);
   } while (1);
 
-
-  const char *desc[] = {path};
-  logFile("INFO", "MKDIR", res, 1, desc);
+	char *toStartPtr = strstr(path, "/AtoZ_");
+  if (toStartPtr != NULL) {
+		logFile1(fpath, fpath);
+  }
 
 	if (res == -1) return -errno;
 
@@ -420,7 +443,6 @@ static int _symlink(const char *from, const char *to)
 
 static int _rename(const char *from, const char *to)
 {
-printf("proses _rename\n");
 	char ffrom[1000];
 	char fto[1000];
 	changePath(ffrom, from, 0, 1);
@@ -435,7 +457,7 @@ printf("proses _rename\n");
   }
 
   char *toPtr = strrchr(to, '/');
-  char *toStartPtr = strstr(toPtr, "/encv1_");
+  char *toStartPtr = strstr(toPtr, "/AtoZ_");
   if (toStartPtr != NULL) {
     if (toStartPtr - toPtr == 0) {
       const char *desc[] = {fto};
@@ -449,7 +471,13 @@ printf("proses _rename\n");
 
   const char *desc[] = {from, to};
   logFile("INFO", "RENAME", res, 2, desc);
-
+  
+  char *temp = strstr(fto, "/AtoZ_");
+  if (temp != NULL) {
+		logFile1(ffrom, fto);
+  }
+	
+	
 	if (res == -1) return -errno;
 
 	return 0;
@@ -674,7 +702,6 @@ static int _write(const char *path, const char *buf, size_t size, off_t offset, 
 
 static int _statfs(const char *path, struct statvfs *stbuf)
 {
-printf("proses _statfs\n");
 	char fpath[1000];
 	changePath(fpath, path, 0, 1);
 	int res;
