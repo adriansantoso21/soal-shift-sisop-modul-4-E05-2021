@@ -180,7 +180,66 @@ if (ptr != NULL && state)
         }
 ```
 
-kem
+Jika isFileAsked bernilai true, kita akan memisahkan direktori dan file dengan fungsi ```getDirAndFile```. Kemudian, kita cari ekstensi dari file dengan fungsi ```strrchr(pathFileBuff, '.')```. Fungsi ```if (whereIsExtension - pathFileBuff < 1)``` untuk file yang tidak mempunyai ekstensi. Di sini kita bisa langsung melakukan dekripsi folder dan file nya .Else nya untuk file yang mempunyai ekstensi. Untuk file yang mempunyai ekstensi, file dan folder akan diencrypt sedangkan ekstensi file tidak akan di decrypt.
+```c
+else if (isFileAsked)
+        {
+            char pathFileBuff[1000];
+            char pathDirBuff[1000];
+            char pathExtBuff[1000];
+            getDirAndFile(pathDirBuff, pathFileBuff, pathEncryptedBuff);
+            char *whereIsExtension = strrchr(pathFileBuff, '.');
+
+            if (whereIsExtension - pathFileBuff < 1)
+            {
+                decrypt(pathDirBuff, 0);
+                decrypt(pathFileBuff, 0);
+                strcat(fixPath, pathEncvDirBuff);
+                strcat(fixPath, pathDirBuff);
+                strcat(fixPath, "/");
+                strcat(fixPath, pathFileBuff);
+            }
+            else
+            {
+                char pathJustFileBuff[1000];
+                memset(pathJustFileBuff, 0, sizeof(pathJustFileBuff));
+                strcpy(pathExtBuff, whereIsExtension);
+                snprintf(pathJustFileBuff, whereIsExtension - pathFileBuff + 1, "%s", pathFileBuff);
+                decrypt(pathDirBuff, 0);
+                decrypt(pathJustFileBuff, 0);
+
+                strcat(fixPath, pathEncvDirBuff);
+                strcat(fixPath, pathDirBuff);
+                strcat(fixPath, "/");
+                strcat(fixPath, pathJustFileBuff);
+                strcat(fixPath, pathExtBuff);
+            }
+        }
+
+```
+
+Selain itu, untuk else pertama yang bukan merupakan isWriteOper, kita langsung melakukan decrpyt pada pathEncyptedBuff. Setelah itu else berikutnya yaitu jika tidak ada 'AtoZ_' maka akan langsung disalin langsung ke fixPath. Jika path hanya '/', maka akan langsung masukkan ke fpath sedangkan jika tidak maka gabungkan dirpath dan fixPath
+```c
+else
+        {
+            decrypt(pathEncryptedBuff, 0);
+            strcat(fixPath, pathEncvDirBuff);
+            strcat(fixPath, pathEncryptedBuff);
+        }
+    }
+    else
+    {
+        strcpy(fixPath, path);
+    }
+    if (strcmp(path, "/") == 0)
+    {
+        sprintf(fpath, "%s", dirpath);
+    }
+    else
+    {
+        sprintf(fpath, "%s%s", dirpath, fixPath);
+    }
+```
 
 Fungsi logFile untuk mencatatkan hasil log ke dalam sebuah file sesuai permintaan soal no 1d. Di mana kita membuka file nya terlebih dahulu, kemudiann tuliskan isi file nya menggunakan ```fprintf``` dan close file nya
 ```c
@@ -260,7 +319,49 @@ if (strstr(path, "/AtoZ_") != NULL)
         }
 ```
 
+Isi file log untuk no 1d  
+![1d](https://user-images.githubusercontent.com/65168221/121800639-4f561b00-cc5d-11eb-9ae6-174b17fe9106.jpg)
+
+Sebelum testing  
+![seblum](https://user-images.githubusercontent.com/65168221/121800661-685ecc00-cc5d-11eb-9e82-4e45763eabf7.jpg)
+
+
+Sesudah testing  
+![sesudah](https://user-images.githubusercontent.com/65168221/121800679-7ad90580-cc5d-11eb-82d2-dae1401a037f.jpg)
+
+
 Kendala :
 - File pernah tidak bisa dibuka pada filesystem mount 
 - Kesusahan untuk melakukan debugging
 - Pernah tidak bisa membuat file di dalam filesystem mount
+
+### No 4
+Fungsi logFile untuk menuliskan log ke dalam file. Di sini, kita gunakan ```time(&t)``` karena kita perlu menggunakan waktu dalam penulisan log. Serta, kita melakukan for untuk melakukan perluangan pada description.
+```c
+void logFile(char *level, char *cmd, int res, int lenDesc, const char *desc[])
+{
+    FILE *f = fopen(logpath, "a");
+    time_t t;
+    struct tm *tmp;
+    char timeBuff[100];
+
+    time(&t);
+    tmp = localtime(&t);
+    strftime(timeBuff, sizeof(timeBuff), "%d%m%Y-%H:%M:%S", tmp);
+
+    fprintf(f, "%s::%s::%s::%d", level, timeBuff, cmd, res);
+    for (int i = 0; i < lenDesc; i++)
+    {
+        fprintf(f, "::%s", desc[i]);
+    }
+    fprintf(f, "\n");
+
+    fclose(f);
+}
+```
+
+Isi file log untuk no4
+![1623573108987](https://user-images.githubusercontent.com/65168221/121800687-84626d80-cc5d-11eb-9204-81de70054342.jpg)
+
+Kendala : 
+- Agak bingung dengan description 
