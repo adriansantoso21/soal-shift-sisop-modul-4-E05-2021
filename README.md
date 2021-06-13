@@ -318,7 +318,74 @@ if (strstr(path, "/AtoZ_") != NULL)
                 break;
         }
 ```
+Fungsi mkdir berfungsi untuk membuat direktori pada path. Pada fungsi mkdir di bawah akan dilakukan ```changePath``` terhadap path untuk mendapatkan fpath, setiap pembuatan direktori "/AtoZ_" akan dimasukkan ke dalam log dengan level ```INFO```. Lalu mkdir akan dijalankan dan hasilnya akan direturn.
+```
+static int _mkdir(const char *path, mode_t mode)
+{
+    char fpath[1000];
+    changePath(fpath, path, 1, 0);
+    char *ptr = strrchr(path, '/');
+    char *filePtr = strstr(ptr, "/AtoZ_");
+    if (filePtr != NULL)
+    {
+        if (filePtr - ptr == 0)
+        {
+            const char *desc[] = {path};
+            logFile("INFO", "MKDIR", 0, 1, desc);
+        }
+    }
+    int res;
+    res = mkdir(fpath, mode);
+    char *temp = strstr(fpath, "/AtoZ_");
+    if (temp != NULL)
+    {
+        logFile1(fpath, fpath);
+    }
+    if (res == -1)
+        return -errno;
 
+    return 0;
+}
+```
+Fungsi unlink digunakan untuk menghapus file pada path. Pada fungsi unlink di bawah akan dilakukan ```changePath``` terhadap path untuk mendapatkan fpath. Fungsi ini akan menghapus file pada path dan akan dimasukkan ke dalam log dengan log level ```WARNING```. Selanjutnya, unlink akan dijalankan dan hasilnya akan direturn.
+```
+static int _unlink(const char *path)
+{
+    char fpath[1000];
+    changePath(fpath, path, 0, 1);
+
+    int res;
+
+    res = unlink(fpath);
+
+    const char *desc[] = {path};
+    logFile("WARNING", "UNLINK", res, 1, desc);
+
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+```
+Selanjutnya fungsi rmdir, pada fungsi ini akan dilakukan ```changePath``` terhadap path untuk mendapatkan fpath. Fungsi ini akan melakukan penghapusan direktori dan akan dimasukkan ke dalam log dengan log level ```WARNING```. Kemudian rmdir akan dijalankan dan akan mereturn hasilnya.
+```
+static int _rmdir(const char *path)
+{
+    char fpath[1000];
+    changePath(fpath, path, 0, 0);
+    int res;
+
+    res = rmdir(fpath);
+
+    const char *desc[] = {path};
+    logFile("WARNING", "RMDIR", res, 1, desc);
+
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+```
 Isi file log untuk no 1d  
 ![1d](https://user-images.githubusercontent.com/65168221/121800639-4f561b00-cc5d-11eb-9ae6-174b17fe9106.jpg)
 
